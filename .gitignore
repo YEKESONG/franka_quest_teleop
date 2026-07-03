@@ -1,0 +1,15 @@
+# ROS2 / colcon 编译产物（换机器后 colcon build 会重新生成，不要提交）
+build/
+install/
+log/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+.DS_Store
