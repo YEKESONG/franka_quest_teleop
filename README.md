@@ -60,6 +60,14 @@ bash /docker_volume/scripts/run_vr_bridge.sh            # 终端2 Quest 桥接
 > 本仓库是**源码快照**，不含 `build/ install/ log/`（换机器 `colcon build` 重新生成），
 > 也不含 `diag_logs/`（诊断录制产物，几十 MB，每次跑都会重新生成）。
 
+**故意没收进来的东西**（原开发机 `~/libfranka-docker/docker_volume/` 里还有，但这条通路用不到）：
+
+| 没收 | 为什么 |
+|---|---|
+| `libfranka/`(0.9.2)、`libfranka_v0.13.2/`(0.13.3) 源码 | 都是**错版本**。FR3 服务器 v10 要 ≥0.20，现在统一用 apt 的 0.20.4。收进来只会诱导别人编错版本 |
+| `franka_ros2_OLD_v0.1.15/` | 早期版本，已被 v2.3.0 取代 |
+| `catkin_ws/`（ROS1 franka_ros） | ROS1 分支，本方案没用到 |
+
 ---
 
 ## 文档
