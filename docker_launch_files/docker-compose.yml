@@ -1,62 +1,49 @@
-version: "2"
+# Quest 3S 遥操 FR3 —— 运行容器
+#
+#   cd <仓库根>
+#   xhost +local:docker                                        # RViz 要显示就得先执行(每次重启后)
+#   docker compose -f docker_launch_files/docker-compose.yml build
+#   docker compose -f docker_launch_files/docker-compose.yml run --rm franka_dev
+#
+# 再开一个终端接进同一个容器：
+#   docker exec -it franka_dev bash
+#
+# 仓库根整个挂到容器里的 /docker_volume —— 容器内路径与文档、脚本、
+# 已有 launch 文件里写的 /docker_volume/... 完全一致。
 
 services:
 
-  franka_ros:
-
-    build:
-      context: ./franka_ros
-      dockerfile: Dockerfile
-      
-    image: libfranka:franka_ros
-    
-    container_name: u20.04-franka_ros 
-
-    volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix    
-      - /dev:/dev                        
-      - ../docker_volume:/docker_volume 
-
-    environment:
-      - DISPLAY=$DISPLAY
-      - TZ=Europe/London
-      - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu
-    
-    network_mode: host
-    
-    privileged: true
-
-    cap_add:
-      - SYS_NICE
-    
-    tty: true
-
-
-  franka_ros2:
+  franka_dev:
 
     build:
       context: ./franka_ros2
       dockerfile: Dockerfile
-      
+
     image: libfranka:franka_ros2
-    
-    container_name: u22.04-franka_ros2 
+
+    container_name: franka_dev
 
     volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw    
-      - /dev:/dev                        
-      - ../docker_volume:/docker_volume 
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw   # RViz
+      - /dev:/dev                          # adb 读 Quest(USB) + 实时设备
+      - ..:/docker_volume                  # ★ 仓库根 = /docker_volume
 
     environment:
-      - DISPLAY=$DISPLAY
-      - TZ=Europe/London
-      - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu
-    
-    network_mode: host
-    
-    privileged: true
+      - DISPLAY=${DISPLAY}
+      - TZ=Asia/Shanghai
+      - LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu
 
+    # 必须 host 网络：机械臂在 172.16.0.2/3，且要和宿主机上的 ROS 节点互通
+    network_mode: host
+
+    # FR3 的 1kHz 实时控制回路需要 SYS_NICE 提实时优先级；
+    # privileged + /dev 挂载是为了 adb 直接看到 USB 上的 Quest
+    privileged: true
     cap_add:
       - SYS_NICE
-    
+    ulimits:
+      rtprio: 99
+      memlock: -1
+
     tty: true
+    stdin_open: true
