@@ -31,7 +31,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 PAR=()
-[[ -n "$JOBS" ]] && PAR=(--parallel-workers "$JOBS")
+if [[ -n "$JOBS" ]]; then
+    PAR=(--parallel-workers "$JOBS")
+    # 只限 colcon 的"同时编几个包"是不够的：每个包内部的 make 默认还会按 CPU 核数
+    # 再开一层并行。20 核 15G 内存的机器上，这一层能把内存瞬间打满 → 编译进程被 OOM
+    # killer 干掉，表现为"编到一半莫名失败/整机卡死"。MAKEFLAGS 把内层也一起摁住。
+    export MAKEFLAGS="-j${JOBS}"
+fi
 
 step_enabled() {   # $1 = 步骤号
     [[ -n "$ONLY" ]] && { [[ "$1" == "$ONLY" ]]; return; }
