@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- 禁用 FastDDS 共享内存传输，强制只走 UDPv4。
+     原因：franka_dev 容器是 IpcMode=private，FastDDS 的 SHM 段跨不过 IPC 命名空间。
+     同厂商(FastDDS)+同主机名时 FastDDS 会优先选 SHM，导致「发现能通、数据收不到」：
+     宿主机 ros2 topic list 看得见 /left/debug_target、/tf，但 echo 一条消息都收不到，
+     TF 树里连 left_fr3_link0 都不存在。禁掉 SHM 后全部走 UDP，与宿主机正常互通。
+     用法（franka_dev 内每个启动节点的终端都要 export）：
+       export FASTRTPS_DEFAULT_PROFILES_FILE=/docker_volume/udp_only.xml
+-->
+<dds>
+  <profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+    <transport_descriptors>
+      <transport_descriptor>
+        <transport_id>udp_only_transport</transport_id>
+        <type>UDPv4</type>
+      </transport_descriptor>
+    </transport_descriptors>
+    <participant profile_name="udp_only_participant" is_default_profile="true">
+      <rtps>
+        <userTransports>
+          <transport_id>udp_only_transport</transport_id>
+        </userTransports>
+        <useBuiltinTransports>false</useBuiltinTransports>
+      </rtps>
+    </participant>
+  </profiles>
+</dds>
