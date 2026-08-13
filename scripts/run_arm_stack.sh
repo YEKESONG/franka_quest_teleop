@@ -51,9 +51,8 @@ ros_source "$ROOT/setup_env.sh"
 export DISPLAY="${DISPLAY:-:0}"
 
 if [[ "$FAKE" == "false" ]]; then
-    echo "⚠ 真机模式：确认两台 FR3 已解抱闸、外部急停在手边、周围无人。"
-    echo "  左臂 $IP_L / 右臂 $IP_R （active_arm=$ARM）"
-    echo -n "  按 Enter 继续，Ctrl-C 取消 ... "; read -r _
+    echo "⚠ 真机模式：左臂 $IP_L / 右臂 $IP_R （active_arm=$ARM）"
+    echo "  确认 FR3 已解抱闸、外部急停在手边、工作空间无人。"
 fi
 
 exec ros2 launch franka_vr dual_franka_teleop.launch.py \
