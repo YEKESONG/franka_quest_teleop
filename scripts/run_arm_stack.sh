@@ -12,6 +12,16 @@
 #        robot_ip_left:=172.16.0.2 robot_ip_right:=172.16.0.3
 set -euo pipefail
 
+# ROS 的 setup.bash 内部引用了未定义的 AMENT_TRACE_SETUP_FILES 等变量，
+# 在 set -u 下会直接以 "unbound variable" 退出。source 期间临时关掉 -u。
+ros_source() {
+    [[ -f "$1" ]] || return 0
+    set +u
+    # shellcheck disable=SC1090
+    source "$1"
+    set -u
+}
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 ARM=both
@@ -37,7 +47,7 @@ done
 
 case "$ARM" in left|right|both) ;; *) echo "--arm 只能是 left/right/both"; exit 1 ;; esac
 
-source "$ROOT/setup_env.sh"
+ros_source "$ROOT/setup_env.sh"
 export DISPLAY="${DISPLAY:-:0}"
 
 if [[ "$FAKE" == "false" ]]; then

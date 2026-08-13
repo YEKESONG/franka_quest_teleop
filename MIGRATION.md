@@ -46,14 +46,20 @@ cd <仓库根>
 xhost +local:docker          # 每次宿主机重启后都要执行一次，否则 RViz 起不来
 
 docker compose -f docker_launch_files/docker-compose.yml build      # 首次约 10-20 分钟
-docker compose -f docker_launch_files/docker-compose.yml run --rm franka_dev
+docker compose -f docker_launch_files/docker-compose.yml up -d      # 后台常驻
+docker exec -it franka_dev bash                                     # 进容器
 ```
 
-再开终端接进同一个容器：
+遥操要开好几个终端，每个都这样接进**同一个**容器：
 
 ```bash
 docker exec -it franka_dev bash
 ```
+
+> 别用 `docker compose run --rm` 来干活：那样每次都新建一个名字随机
+> （`docker_launch_files-franka_dev-run-<hash>`）的临时容器，退出即删，
+> `docker exec -it franka_dev` 根本连不上，容器内 `pip install` 之类的改动也留不下。
+> `run --rm` 只适合"跑一条命令就走"的场景。
 
 > **这台开发机上要注意**：已经有一个在跑的老容器也叫 `franka_dev`（镜像 tag
 > `libfranka:franka_ros2`）。本仓库的 compose 用的是**另一个** tag

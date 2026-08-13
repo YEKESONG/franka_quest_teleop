@@ -11,9 +11,21 @@
 #   2) ws_moveit2    MoveIt2 2.13.0 源码                            (最重, 双核约数小时)
 #   3) ws_ik_plugins pick_ik                                        (必须针对源码版 moveit_core 编)
 #   4) ws_franka_vr  franka_vr 本体                                 (依赖 1+2)
-#   5) pip -e oculus_reader                                         (reader.py 用绝对包名 import,
-#                                                                    不装这一步桥接脚本会 ImportError)
+#   5) pip -e oculus_reader                                         (可选: setup_env.sh 已用
+#                                                                    PYTHONPATH 覆盖同样的作用。
+#                                                                    pip 装在容器 site-packages 里,
+#                                                                    run --rm 退出即失效)
 set -euo pipefail
+
+# ROS 的 setup.bash 内部引用了未定义的 AMENT_TRACE_SETUP_FILES 等变量，
+# 在 set -u 下会直接以 "unbound variable" 退出。source 期间临时关掉 -u。
+ros_source() {
+    [[ -f "$1" ]] || return 0
+    set +u
+    # shellcheck disable=SC1090
+    source "$1"
+    set -u
+}
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JOBS=""
@@ -50,7 +62,7 @@ if [[ ! -d /opt/ros/humble ]]; then
     echo "✗ 找不到 /opt/ros/humble —— 这个脚本要在 franka_dev 容器里跑。" >&2
     exit 1
 fi
-source /opt/ros/humble/setup.bash
+ros_source /opt/ros/humble/setup.bash
 
 # ---- 1) franka_ros2 ----------------------------------------------------------
 if step_enabled 1; then
@@ -58,7 +70,7 @@ if step_enabled 1; then
     cd "$ROOT/ros2_ws"
     colcon build "${PAR[@]}" --cmake-args -DCMAKE_BUILD_TYPE=Release
 fi
-[[ -f "$ROOT/ros2_ws/install/setup.bash" ]] && source "$ROOT/ros2_ws/install/setup.bash"
+ros_source "$ROOT/ros2_ws/install/setup.bash"
 
 # ---- 2) MoveIt2 --------------------------------------------------------------
 if step_enabled 2; then
@@ -67,7 +79,7 @@ if step_enabled 2; then
     cd "$ROOT/ws_moveit2"
     colcon build "${PAR[@]}" --cmake-args -DCMAKE_BUILD_TYPE=Release
 fi
-[[ -f "$ROOT/ws_moveit2/install/setup.bash" ]] && source "$ROOT/ws_moveit2/install/setup.bash"
+ros_source "$ROOT/ws_moveit2/install/setup.bash"
 
 # ---- 3) pick_ik --------------------------------------------------------------
 if step_enabled 3; then
@@ -75,7 +87,7 @@ if step_enabled 3; then
     cd "$ROOT/ws_ik_plugins"
     colcon build "${PAR[@]}" --cmake-args -DCMAKE_BUILD_TYPE=Release
 fi
-[[ -f "$ROOT/ws_ik_plugins/install/setup.bash" ]] && source "$ROOT/ws_ik_plugins/install/setup.bash"
+ros_source "$ROOT/ws_ik_plugins/install/setup.bash"
 
 # ---- 4) franka_vr ------------------------------------------------------------
 if step_enabled 4; then
@@ -84,7 +96,7 @@ if step_enabled 4; then
     colcon build "${PAR[@]}" --packages-select franka_vr --symlink-install \
         --cmake-args -DCMAKE_BUILD_TYPE=Release
 fi
-[[ -f "$ROOT/ws_franka_vr/install/setup.bash" ]] && source "$ROOT/ws_franka_vr/install/setup.bash"
+ros_source "$ROOT/ws_franka_vr/install/setup.bash"
 
 # ---- 5) oculus_reader (editable) ---------------------------------------------
 if step_enabled 5; then

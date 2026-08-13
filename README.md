@@ -21,13 +21,13 @@ cd franka_quest_teleop
 # 1. 起容器（仓库根会被挂到容器里的 /docker_volume）
 xhost +local:docker                                             # RViz 要显示
 docker compose -f docker_launch_files/docker-compose.yml build
-docker compose -f docker_launch_files/docker-compose.yml run --rm franka_dev
+docker compose -f docker_launch_files/docker-compose.yml up -d  # 后台常驻
+docker exec -it franka_dev bash                                 # 要几个终端就 exec 几次
 
 # 2. 容器内编译（第一次很久：MoveIt2 那步双核约数小时）
-bash /docker_volume/scripts/build_all.sh          # 内存小加 -j 2
+bash /docker_volume/scripts/build_all.sh -j 2     # 内存 <16G 就用 2，别用满核
 
-# 3. 跑（两个终端，都先 source）
-source /docker_volume/setup_env.sh
+# 3. 跑（两个终端，各自 docker exec 进来）
 bash /docker_volume/scripts/run_arm_stack.sh --real     # 终端1 机械臂栈
 bash /docker_volume/scripts/run_vr_bridge.sh            # 终端2 Quest 桥接
 ```
