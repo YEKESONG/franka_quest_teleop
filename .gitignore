@@ -17,3 +17,7 @@ diag_logs/
 .idea/
 *.swp
 .DS_Store
+
+# 编译日志（build_all.sh 输出，不入库）
+build.log
+*.log
