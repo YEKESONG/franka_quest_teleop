@@ -1,0 +1,36 @@
+# ============================================================================
+# ⚠️ 防误解横幅（务必先读）
+#   当前双臂遥操节点 demo_franka_vr_vel 运行在 MoveIt Servo 的 TWIST(速度)模式：
+#   twist→关节 由【雅可比伪逆】完成，【不调用本 IK 插件(pick_ik / setFromIK)】。
+#   dual_franka_teleop.launch.py 也【未启动 move_group】。
+#   ⇒ 下面的求解器/权重参数【对实时遥操全部不生效】，仅当改回 POSE 模式
+#     (servo.setCommandType(CommandType::POSE)) 或使用 move_group 离线规划时才会被调用。
+#
+#   为什么不删这个文件：dual_franka_teleop.launch.py 第47行无条件 _load_yaml 读取它，
+#   删除会导致 launch 抛 FileNotFoundError 崩溃。故保留但明确标注为“遥操不生效”。
+#
+#   遥操链路里“限位/避限位”实际由谁决定：
+#     - 冗余分配 = 雅可比伪逆(最小范数解，本身不做避限位)
+#     - 硬限位缓冲 = fr3_servo_left.yaml 的 joint_limit_margins
+# ============================================================================
+left_fr3_arm:
+  kinematics_solver: pick_ik/PickIkPlugin
+  kinematics_solver_timeout: 0.005
+  kinematics_solver_attempts: 1
+
+  mode: local                        # (仅 POSE 模式生效) 梯度下降, 种子=当前关节角
+  position_scale: 1.0
+  rotation_scale: 0.5
+
+  minimal_displacement_weight: 0.3   # (仅 POSE 模式生效) 连续性: 解贴近种子
+  avoid_joint_limits_weight: 0.05    # (仅 POSE 模式生效; 遥操不生效) 已退回 pick_ik 默认值
+  center_joints_weight: 0.0
+
+  position_threshold: 0.001
+  orientation_threshold: 0.001
+  cost_threshold: 0.001
+  approximate_solution_position_threshold: 0.05
+  approximate_solution_orientation_threshold: 0.05
+
+  gd_step_size: 0.0001
+  gd_max_iters: 100

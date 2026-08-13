@@ -32,8 +32,7 @@ foreach(dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
 endforeach()
 # 生成服务接口
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/SetStepSize.srv"
-  "srv/SetTargetPose.srv"  # 添加新服务
+  "srv/SetTargetPose.srv"
   DEPENDENCIES std_msgs geometry_msgs
 )
 # 获取生成接口的目标

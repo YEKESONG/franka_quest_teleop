@@ -46,7 +46,10 @@ class OculusReader:
     def run(self):
         self.running = True
         self.device.shell('am start -n "com.rail.oculus.teleop/com.rail.oculus.teleop.MainActivity" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER')
-        self.thread = threading.Thread(target=self.device.shell, args=("logcat -T 0", self.read_logcat_by_line))
+        # 只让设备侧输出 app 自己的 tag(wE9ryARX:I),其余全部静音(-s)。
+        # 否则 logcat -T 0 会把整台 Quest 的日志洪流(每秒上万行)灌过来,
+        # read_logcat_by_line 逐行 grep 会把一个核跑满(忙等)。过滤后只剩 ~70 行/秒。
+        self.thread = threading.Thread(target=self.device.shell, args=("logcat -T 0 -s wE9ryARX:I", self.read_logcat_by_line))
         self.thread.start()
 
     def stop(self):
