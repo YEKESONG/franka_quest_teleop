@@ -1,10 +1,9 @@
-# Meta Quest 3S 遥操 Franka FR3 —— 环境迁移与重建手册
+# Quest 3S 遥操 Franka FR3 —— 环境重建手册
 
-本仓库是一套**已在真机 FR3（双臂）上跑通**的 Quest 3S VR 遥操方案的**源码快照**。
-换新设备时，按本文档重建即可，无需再从零踩坑。
+从零把这套遥操跑起来。每一步都标了"为什么"，踩过的坑写在原地，不用再踩一遍。
 
-> 本快照**只含源码**，已剔除 `build/ install/ log/` 和各依赖的嵌套 `.git`。
-> 换机器后用 `colcon build` 重新编译即可。
+> 本仓库是**源码快照**：不含 `build/ install/ log/`、不含各依赖的嵌套 `.git`。
+> 换机器 `colcon build` 重新生成即可。
 
 ---
 
@@ -12,135 +11,202 @@
 
 | 项 | 值 |
 |---|---|
-| 机器人 | Franka **FR3 双臂**（左臂 `172.16.0.2`，右臂 `172.16.0.3`；本方案默认遥操右臂） |
-| 机器人服务器版本 | version **10**（决定了 libfranka 必须 ≥ 0.20） |
-| VR 设备 | Meta **Quest 3S**（手柄遥操） |
+| 机器人 | Franka **FR3 双臂**（左 `172.16.0.2`，右 `172.16.0.3`） |
+| 机器人服务器版本 | **version 10** ← 这一条决定了 libfranka 必须 ≥ 0.20 |
+| VR 设备 | Meta **Quest 3S**（双手柄） |
 | 宿主系统 | Ubuntu 22.04 + Docker + Docker Compose v2 |
-| 容器基础 | ROS2 **Humble** |
+| 容器基础 | ROS 2 **Humble** |
+| 建议内存 | ≥16 G（编 MoveIt2 用；小内存要降并行度） |
+| 网络 | 宿主机能 ping 通 172.16.0.2/3；容器用 host 网络 |
+
+单臂也能跑：所有 launch / 脚本都支持 `active_arm:=left|right|both`。
 
 ---
 
-## 1. 关键版本（务必对齐，版本错了会不兼容）
+## 1. 版本对齐（**先看这张表**，版本错了后面全白搭）
 
-| 组件 | 版本 | 说明 |
-|---|---|---|
-| libfranka | **0.20.4** | 真机服务器 version 10 要求；用 0.13.x 会报 `Incompatible library version (server 10, library 7)` |
-| franka_ros2 | **v2.3.0** | 与 libfranka 0.20.4 配套 |
-| franka_description | **1.6.1** | franka_ros2 v2.3.0 的 dependency.repos 指定 |
-| MoveIt2 | **2.13.0**（源码编译） | 必须源码编译新版；Humble apt 自带的 2.5.9 是旧 `servo.h` 架构，跑不了本方案的新 `moveit_servo`（`servo.hpp` / `getNextJointState` / `TwistCommand`） |
-| moveit_servo | 随 MoveIt2 2.13.0 | 新 C++ 库 API |
-| random_numbers | `ros2` 分支 | `geometric_shapes` 编译依赖，需单独源码克隆 |
+| 组件 | 版本 | 装法 | 错了会怎样 |
+|---|---|---|---|
+| libfranka | **0.20.4** | apt `ros-humble-libfranka=0.20.4-*`（Dockerfile 已带） | 装 0.13.x → 真机报 `Incompatible library version (server 10, library 7)` |
+| franka_ros2 | **v2.3.0** (`7ed0458`) | 本仓库 `ros2_ws/src/` 已带 | 与 libfranka 版本不配套，编译或运行时报接口错 |
+| franka_description | **1.6.1** (`2c4610f`) | 同上 | xacro 不支持 `arm_prefix` / `connected_to`，双臂前缀化起不来 |
+| MoveIt2 | **2.13.0** (`bb2eb75`) | 本仓库 `ws_moveit2/src/` 源码编译 | apt 的 2.5.9 是旧 `servo.h` 架构，本方案的 `servo.hpp`/`getNextJointState`/`TwistCommand` 全不存在 |
+| moveit_msgs / geometric_shapes / srdfdom / random_numbers / moveit_resources | MoveIt2 2.13.0 配套的 ros2 分支 | 同上 | `geometric_shapes` 缺 `random_numbers::random_numbers` target |
+| pick_ik | **1.1.2** (`7e1794a`) | 本仓库 `ws_ik_plugins/src/` 源码编译 | **不能 apt 装**：apt 版会拉 apt 版 `moveit_core`，和源码版并存 → ABI 冲突 → 加载即崩 |
 
----
-
-## 2. 目录结构
-
-```
-franka_quest_teleop/
-├── docker_launch_files/      # Docker 构建配方（Dockerfile + docker-compose + install 脚本）
-│   ├── franka_ros2/          # ← 我们用这个（franka_ros2 分支）
-│   └── franka_ros/           # ROS1 版，本方案没用到
-├── setup_env.sh              # 容器内一键 source 所有工作区
-├── ws_franka_vr/src/         # ★ 核心：本项目自研/改造的 franka_vr 包
-├── ws_moveit2/src/           # MoveIt2 2.13.0 源码（6 个包）
-└── ros2_ws/src/              # franka_ros2 v2.3.0 + franka_description 1.6.1
-```
-
-三个工作区在容器内挂载到 `/docker_volume/` 下，与宿主机双向同步。
+> 旧配方里"从源码编 `libfranka_v0.13.2` 再 `dpkg -i`"那条路**已废弃**——它装出来的是 0.13.3，
+> 对 FR3 服务器 v10 是错版本。现在统一用 apt 的 0.20.4。
 
 ---
 
-## 3. 重建步骤（新机器）
+## 2. 起容器
 
-### 3.1 起 Docker 容器
 ```bash
-# 宿主机装好 Docker + Docker Compose v2
-cd docker_launch_files
-docker compose run franka_ros2        # 构建并进入容器
-# 需要图形界面(RViz)时，宿主机先执行： xhost +local:docker
-```
-> 把本仓库三个工作区放到容器挂载的 `/docker_volume/` 下（或调整 compose 的挂载路径指向本仓库）。
+cd <仓库根>
+xhost +local:docker          # 每次宿主机重启后都要执行一次，否则 RViz 起不来
 
-### 3.2 编译顺序（**顺序不能乱**，后者依赖前者）
+docker compose -f docker_launch_files/docker-compose.yml build      # 首次约 10-20 分钟
+docker compose -f docker_launch_files/docker-compose.yml run --rm franka_dev
+```
+
+再开终端接进同一个容器：
+
+```bash
+docker exec -it franka_dev bash
+```
+
+compose 做了这几件事，缺一不可：
+
+| 配置 | 为什么 |
+|---|---|
+| `..:/docker_volume` | **仓库根 = 容器里的 `/docker_volume`**，编译产物落在宿主机，容器可随时重建 |
+| `network_mode: host` | 机械臂在 172.16.0.x，且要和宿主机上的 ROS 节点互通 |
+| `privileged` + `/dev:/dev` | adb 直接看到 USB 上的 Quest；实时设备访问 |
+| `cap_add: SYS_NICE` + `rtprio: 99` | FR3 的 1 kHz 实时控制回路要提实时优先级 |
+| `/tmp/.X11-unix` + `DISPLAY` | RViz |
+
+> 容器入口**不会**自动编译（旧的 `install_franka_ros2.sh` 会，编几小时且失败就进不去容器）。
+> 编译是显式的一步，见下。
+
+---
+
+## 3. 编译（顺序不能乱，后者依赖前者）
+
+```bash
+bash /docker_volume/scripts/build_all.sh          # 全编
+bash /docker_volume/scripts/build_all.sh -j 2     # 内存 <16G / 双核机器
+bash /docker_volume/scripts/build_all.sh --from 2 # 编挂了从第 2 步接着编
+bash /docker_volume/scripts/build_all.sh --only 4 # 只改了 franka_vr 时
+```
+
+脚本干的就是下面这五步，手动等价于：
+
 ```bash
 source /opt/ros/humble/setup.bash
 
-# (1) franka_ros2 v2.3.0
-cd /docker_volume/ros2_ws
-colcon build
+# (1) franka_ros2 v2.3.0 + franka_description 1.6.1
+cd /docker_volume/ros2_ws && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
 
-# (2) MoveIt2 2.13.0（最重，双核约需数小时，可挂夜里跑）
-cd /docker_volume/ws_moveit2
-#   若缺 random_numbers：
-#   git clone https://github.com/moveit/random_numbers -b ros2 src/random_numbers
-#   （并清掉 build/geometric_shapes 缓存后重编）
-colcon build --parallel-workers 2      # 内存小就降到 2 线程
+# (2) MoveIt2 2.13.0 —— 最重的一步，双核约数小时，可挂夜里跑
+cd /docker_volume/ws_moveit2 && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
 
-# (3) franka_vr（本项目）
-cd /docker_volume/ws_franka_vr
-colcon build --packages-select franka_vr
+# (3) pick_ik（必须针对上一步的源码版 moveit_core 编）
+cd /docker_volume/ws_ik_plugins && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
+
+# (4) franka_vr 本体
+cd /docker_volume/ws_franka_vr && colcon build --packages-select franka_vr --symlink-install
+source install/setup.bash
+
+# (5) 桥接脚本的 python 包（reader.py 用绝对包名 import，不装会 ImportError）
+pip3 install -e /docker_volume/ws_franka_vr/src/franka_vr/oculus_reader
 ```
 
-### 3.3 曾经踩过的坑（新机器如复现，照此修）
-- **`franka_semantic_components` 找不到 `controller_interface/helpers.hpp`**
-  → 在 `franka_semantic_components/CMakeLists.txt` 的 `THIS_PACKAGE_INCLUDE_DEPENDS`
-    和 `package.xml` 里加上 `controller_interface`。
-    （franka_ros2 v2.3.0 本身可能已包含，先直接编译，报错再补。）
-- **`geometric_shapes` 需要 `random_numbers::random_numbers` target**
-  → 见 3.2 (2) 里克隆 `random_numbers -b ros2`。
-- **Eigen 三元表达式 `?:` 类型报错**（`franka_vr_vel.cpp`）→ 已改成 `if` 赋值，本快照已修好。
+**第 2 步失败绝大多数是 OOM**（进程被杀 / 机器卡死）→ 降到 `-j 2`，再 `--from 2` 续编。
 
----
-
-## 4. 运行（真机遥操）
+编完每个新终端只需：
 
 ```bash
-# 每个终端都先：
 source /docker_volume/setup_env.sh
-
-# 终端1：拉起机器人 + MoveIt Servo + 控制器 + 夹爪（遥操右臂 172.16.0.3）
-ros2 launch franka_vr franka_twist.launch.py \
-     robot_ip:=172.16.0.3 use_fake_hardware:=false load_gripper:=true
-
-# 终端2：Quest 桥接节点
-cd /docker_volume/ws_franka_vr/src/franka_vr/oculus_reader
-python3 oculus_reader/start_franka_vr.py
 ```
 
-### Quest 3S 准备
-1. `adb` 连上头显（USB），首次需在头显里点 **允许调试授权**。
-2. 安装遥操 APK：`adb install ws_franka_vr/src/franka_vr/oculus_reader/oculus_reader/APK/teleop-debug.apk`
-3. `start_franka_vr.py` 通过 adb 从 APK 读手柄位姿+按键。
-
-### 操作
-- **右扳机 (rightTrig) > 0.1**：进入遥操跟随（松开即停）。
-- **右握把 (rightGrip)**：> 0.6 关夹爪，< 0.4 开夹爪。
+它按 franka_ros2 → MoveIt2 → pick_ik → franka_vr 的顺序 source（overlay 顺序不能反），
+并自动 `export FASTRTPS_DEFAULT_PROFILES_FILE=<仓库根>/udp_only.xml`。
 
 ---
 
-## 5. 本方案的遥操控制逻辑（相对原开源版的改造）
+## 4. 跑起来
 
-- **位置**：绝对映射——手柄在 `fr3_link0` 系下的绝对位置 = 夹爪目标位置。
-- **姿态**：相对增量——按扳机瞬间记录手柄+夹爪姿态基准，之后
-  `夹爪目标姿态 = (手柄相对转动) ⊗ 夹爪基准`（按下瞬间不翻）。
-- **全程限速**（`franka_vr_vel.cpp`）：线速度 `min(3.0×误差, 0.08 m/s)`、
-  角速度 `min(1.0×角误差, 0.3 rad/s)`——根治"按下猛冲触发 reflex"。
-  > 标定对齐好后可把 `v_lin_max`（当前 0.08）往上调，提升响应速度。
-- **跳变/追踪保护**：单帧位移 > 0.08m 丢弃；右手柄旋转矩阵 `det≈1` 才发布。
-- **待办**：`oculus_base` 静态变换（x/y/z/rpy）与 scale 的精细标定，
-  目标是"手柄碰桌面 = 夹爪碰桌面"的绝对对齐。绝对映射对**追踪稳定性**极敏感，
-  标定前务必先保证头显佩戴稳定、手柄始终在头显相机视野内。
+### 4.1 Quest 准备（一次性）
 
----
+```bash
+bash /docker_volume/scripts/setup_quest_adb.sh
+```
 
-## 6. 组件来源（致谢 / 可追溯）
+它会：验 adb → 列设备 → 检查有没有别的进程抢 adb → 装/拉起 APK。
+首次连线要**戴上头显**点"允许 USB 调试 → 一律允许"。
 
-| 组件 | 来源 |
+APK 在 `ws_franka_vr/src/franka_vr/oculus_reader/oculus_reader/APK/teleop-debug.apk`
+（包名 `com.rail.oculus.teleop`），桥接节点起来时也会自己检查并安装。
+
+### 4.2 仿真先跑一遍（不碰真机）
+
+```bash
+source /docker_volume/setup_env.sh
+bash /docker_volume/scripts/run_arm_stack.sh                    # 双臂仿真 + RViz
+bash /docker_volume/scripts/run_vr_bridge.sh                    # 另一个终端
+```
+
+RViz 里能看到双臂、按 Enter 后模型跟手动 —— 这一步过了再上真机。
+
+### 4.3 真机
+
+```bash
+# 终端1：控制栈 + MoveIt Servo + 夹爪 + RViz
+bash /docker_volume/scripts/run_arm_stack.sh --real
+#   等价于 ros2 launch franka_vr dual_franka_teleop.launch.py \
+#            active_arm:=both use_fake_hardware:=false \
+#            robot_ip_left:=172.16.0.2 robot_ip_right:=172.16.0.3
+
+# 终端2：Quest 桥接（必须前台跑在交互终端，脚本要读单键）
+bash /docker_volume/scripts/run_vr_bridge.sh
+
+# 终端3（可选）：抖动诊断录制
+cd /docker_volume/ws_franka_vr/src/franka_vr/oculus_reader
+python3 oculus_reader/diag_record.py --side left
+```
+
+上真机前确认：**两台 FR3 已解抱闸、外部急停在手边、工作空间无人**。
+
+### 4.4 操作
+
+| 键 / 手柄 | 作用 |
 |---|---|
-| Docker 环境骨架 | fork 自 `Fjakob/libfranka-docker`（经 `ZorAttC/libfranka-docker`） |
-| franka_vr 包 + Quest APK + oculus_reader | 原开源项目 `franka_vr`（本仓库在其基础上做了兼容性移植与安全化改造） |
-| libfranka / franka_ros2 / franka_description | Franka Robotics 官方 |
-| MoveIt2 / moveit_servo | MoveIt 官方 |
+| `Enter` | 遥操 开 / 关。**接入瞬间自动重锚**：目标 ≡ 当前末端位姿，接入误差恒 0 |
+| `1` / `2` | 遥操进行中，手动重新对零 左 / 右臂 |
+| 手柄 `Grip` | > 0.6 关夹爪，< 0.4 开夹爪 |
+
+常用参数：
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `active_arm` / `--arm` | `both` | `left` / `right` / `both` |
+| `base_sep` | `1.05` | 两台机器人底座实际间距(米)，**要和真机摆位对上** |
+| `control_tip` | `hand` | Servo 控制点：`hand` 或 `link8` |
+| `load_gripper` | `true` | 关掉则不起夹爪节点、URDF 也不带 hand |
+| `SCALE`（脚本内常量） | `2.0` | 手柄位移 → 机械臂位移 |
+
+---
+
+## 5. 遥操控制逻辑（相对原开源版改了什么）
+
+- **位置/姿态都是绝对映射 + 重锚偏置**：`target = 手柄位置×SCALE + cal_offset`、
+  `q_target = q_手柄 ⊗ ori_offset`；两个 offset 在按 Enter 接入的瞬间由实时 TF 算出，
+  使接入误差恒为 0（bumpless）。**不再有标定文件**——历史上标定文件为 0 字节导致过
+  "目标差几米、一启动猛冲报红"。
+- **外环闭在真机实测状态上**（不是内部积分模型），根治来回平移的累积漂移。
+- **速度前馈 + Smith 预测器**：前馈补主体运动（开环，不吃稳定裕度），
+  Smith 预测器把环内延迟从稳定性方程里消掉，根治转腕 2 Hz 共振。
+- **姿态误差用最短弧 + `2·vec` 对数映射**：修掉四元数双覆盖导致的"持续朝一个方向转"，
+  以及 `axis×angle` 在小角度处轴方向乱跳放大成多关节抖。
+- **全程限速限加速度 + 软启动 + 抗积分饱和 + 跳变丢弃**。
+
+完整参数表和"为什么是这些值"见
+[docs/control_tuning_retrospective.md](docs/control_tuning_retrospective.md)。
+**改控制参数前先读它**——里面记了大量已经验证无效甚至有害的改法
+（比如这套系统里"抖动加 kd"是反的）。
+
+---
+
+## 6. 遇到问题
+
+先按 [docs/architecture.md](docs/architecture.md) 的"逐段验证"定位是哪一段断了，
+再查 [docs/troubleshooting.md](docs/troubleshooting.md)。最常见的三个：
+
+| 症状 | 去看 |
+|---|---|
+| 宿主机看得见话题但收不到数据 | FastDDS SHM 跨不过容器 IPC 命名空间 → `udp_only.xml` |
+| 机械臂 ~5 秒周期抽搐 | 别的进程抢 adb，打断了 logcat 长连接 |
+| 真机一连就报 `Incompatible library version` | libfranka 版本不是 0.20.4 |
