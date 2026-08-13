@@ -55,6 +55,12 @@ docker compose -f docker_launch_files/docker-compose.yml run --rm franka_dev
 docker exec -it franka_dev bash
 ```
 
+> **这台开发机上要注意**：已经有一个在跑的老容器也叫 `franka_dev`（镜像 tag
+> `libfranka:franka_ros2`）。本仓库的 compose 用的是**另一个** tag
+> `franka_quest_teleop:humble`，build 不会抢走老 tag、不影响正在跑的通路。
+> 但容器名默认相同，要两个并存就改名：
+> `FRANKA_CONTAINER_NAME=franka_dev2 docker compose -f docker_launch_files/docker-compose.yml up -d`
+
 compose 做了这几件事，缺一不可：
 
 | 配置 | 为什么 |

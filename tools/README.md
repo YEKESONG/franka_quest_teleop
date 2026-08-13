@@ -44,6 +44,18 @@ python3 tools/replay_wuji_vr_dataset.py --dataset ~/lerobot_data/<数据集根�
 
 ---
 
+## 录制脚本在另一个项目里（本仓库不含）
+
+`~/Desktop/gello_ros2/record_wuji_vr_lerobot.py` 是这条通路的**数据录制端**，
+靠订阅桥接节点旁路发的 `/left/debug_target`、`/right/debug_target`（PoseStamped，
+RELIABLE）+ TF `{side}_fr3_link0→{side}_fr3_hand` 拼 state/action。
+
+没收进本仓库，是因为它同时依赖 Manus 手套、Wuji 20 DOF 灵巧手、三路 RealSense 和
+lerobot——属于数采项目，搬过来也跑不起来。这里只记一句：
+**`debug_target` 这个话题就是为它留的旁路**，改桥接节点时别把它删了。
+
+---
+
 ## ../datasets/ —— 样例数据
 
 | 文件 | 内容 |
