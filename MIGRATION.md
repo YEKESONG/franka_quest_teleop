@@ -61,11 +61,9 @@ docker exec -it franka_dev bash
 > `docker exec -it franka_dev` 根本连不上，容器内 `pip install` 之类的改动也留不下。
 > `run --rm` 只适合"跑一条命令就走"的场景。
 
-> **这台开发机上要注意**：已经有一个在跑的老容器也叫 `franka_dev`（镜像 tag
-> `libfranka:franka_ros2`）。本仓库的 compose 用的是**另一个** tag
-> `franka_quest_teleop:humble`，build 不会抢走老 tag、不影响正在跑的通路。
-> 但容器名默认相同，要两个并存就改名：
-> `FRANKA_CONTAINER_NAME=franka_dev2 docker compose -f docker_launch_files/docker-compose.yml up -d`
+> **机器上已有同名镜像或容器时**（例如早期手工搭过环境），用环境变量改名即可并存，
+> 互不覆盖：
+> `FRANKA_IMAGE=my:tag FRANKA_CONTAINER_NAME=franka_dev2 docker compose -f docker_launch_files/docker-compose.yml up -d`
 
 compose 做了这几件事，缺一不可：
 

@@ -13,10 +13,10 @@
 
 ```bash
 # 只检查数据，不连真机（安全，先跑这个）
-python3 tools/replay_wuji_vr_dataset.py --dataset ~/lerobot_data/<数据集根目录> --check
+python3 tools/replay_wuji_vr_dataset.py --dataset <LeRobot 数据集根目录> --check
 
 # 真机回放
-python3 tools/replay_wuji_vr_dataset.py --dataset ~/lerobot_data/<数据集根目录> --execute
+python3 tools/replay_wuji_vr_dataset.py --dataset <LeRobot 数据集根目录> --execute
 ```
 
 它在**宿主机**上跑，自己去操作两个容器（会按需拉起、跑完收拾干净）：
@@ -29,12 +29,12 @@ python3 tools/replay_wuji_vr_dataset.py --dataset ~/lerobot_data/<数据集根�
 脚本会先检查遥操是否还在跑（`start_franka_vr_dual.py` / `wujihand_controller`），
 在跑就拒绝执行 —— 避免两路指令抢同一台机器人。
 
-### 换机器要改的硬编码（脚本顶部常量，本仓库保持逐字节原样收录，没有改动）
+### 需要自己指定的路径（脚本顶部常量，均可用环境变量覆盖）
 
 | 常量 | 当前值 | 说明 |
 |---|---|---|
-| `VOLUME_HOST` | `/home/wang/libfranka-docker/docker_volume` | 宿主机上 `/docker_volume` 的实际路径。**改成本仓库根目录**即可 |
-| `HAND_CONFIG` | `/home/wang/sy/wuji-hand-teleop/.../wujihand_ik.yaml` | 读右手 serial_number，属于 Wuji 项目 |
+| `VOLUME_HOST` | 本仓库根目录（自动推断） | 宿主机上对应容器内 `/docker_volume` 的目录。挂在别处时用环境变量 `FRANKA_VR_ROOT` 覆盖 |
+| `HAND_CONFIG` | 环境变量 `WUJI_HAND_CONFIG` | 读右手 serial_number，属于 Wuji 项目；路径因人而异，必须自己指定 |
 | `WUJI_SETUP` | `/home/wuji/ros2_ws/install/setup.bash` | `wuji-hand-teleop` 容器内路径 |
 
 脚本运行时会把自己 `shutil.copy2` 进 `VOLUME_HOST`，所以它放在 `tools/` 下不影响使用。
@@ -46,7 +46,7 @@ python3 tools/replay_wuji_vr_dataset.py --dataset ~/lerobot_data/<数据集根�
 
 ## 录制脚本在另一个项目里（本仓库不含）
 
-`~/Desktop/gello_ros2/record_wuji_vr_lerobot.py` 是这条通路的**数据录制端**，
+这条通路的**数据录制端**（`record_wuji_vr_lerobot.py`，在数采项目里）
 靠订阅桥接节点旁路发的 `/left/debug_target`、`/right/debug_target`（PoseStamped，
 RELIABLE）+ TF `{side}_fr3_link0→{side}_fr3_hand` 拼 state/action。
 

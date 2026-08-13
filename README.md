@@ -23,7 +23,7 @@ Quest 3S controllers ──adb logcat──> bridge node ──set_target_pose�
 
 ## Table of Contents
 
-- [Why this repository exists](#why-this-repository-exists)
+- [What's in the box](#whats-in-the-box)
 - [System architecture](#system-architecture)
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
@@ -38,18 +38,29 @@ Quest 3S controllers ──adb logcat──> bridge node ──set_target_pose�
 
 ---
 
-## Why this repository exists
+## What's in the box
 
-The working teleoperation stack used to live in an unversioned Docker volume, its container
-environment existed only as packages someone had `apt install`ed by hand, and the tuning
-knowledge was spread across scattered notes. Dozens of rounds of on-hardware iteration were
-one `rm -rf` away from being lost.
+Everything needed to reproduce the pipeline, in one repository:
 
-Everything needed to reproduce the pipeline now lives here:
+| | |
+|---|---|
+| **Source** | The teleoperation package — outer-loop Cartesian controller, dual-arm launch files, all configs, the Quest bridge and its APK — plus every third-party workspace, pinned to exact commits and vendored |
+| **Environment** | A Dockerfile that builds the complete runtime: ROS 2 Humble, libfranka 0.20.4, MoveIt 2 build dependencies, adb, and the bridge's Python stack |
+| **Knowledge** | Architecture with per-stage verification commands, a troubleshooting index of failures actually hit on hardware, and a full control-tuning retrospective |
 
-- **Source** — the teleop package plus every third-party workspace, pinned and vendored
-- **Environment** — a Dockerfile that reconstructs the exact container the robot ran on
-- **Knowledge** — architecture, troubleshooting, and a full control-tuning retrospective
+**What you can reproduce with it**
+
+- Absolute pose following of both arms from the Quest controllers, gripper on the `Grip` axis
+- Bumpless engagement: pressing `Enter` re-anchors the target to the current end-effector pose,
+  so engagement error is always zero and no calibration file exists
+- A control loop that survives real hardware: velocity feed-forward, a Smith predictor that removes
+  the delay-induced ~2 Hz wrist resonance, shortest-arc quaternion error, feedback closed on the
+  measured robot state, and rate/acceleration limiting throughout
+- Single-arm operation from the same launch files (`active_arm:=left|right|both`)
+- Mock-hardware mode for development without a robot
+
+**What it is not** — a general-purpose VR teleoperation framework. It targets FR3 arms with server
+version 10 and Quest controllers, and the tuning is specific to that combination.
 
 The repository root is mounted as `/docker_volume` inside the container, so paths in the docs,
 scripts, and launch files map one-to-one onto paths in this repository.

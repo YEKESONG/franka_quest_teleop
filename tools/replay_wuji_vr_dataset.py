@@ -27,7 +27,10 @@ import numpy as np
 
 FRANKA_CONTAINER = "franka_dev"
 WUJI_CONTAINER = "wuji-hand-teleop"
-VOLUME_HOST = Path("/home/wang/libfranka-docker/docker_volume")
+# 宿主机上对应容器内 /docker_volume 的目录。默认取本仓库根（tools/ 的上一级），
+# 挂在别处时用环境变量 FRANKA_VR_ROOT 覆盖。
+VOLUME_HOST = Path(os.environ.get("FRANKA_VR_ROOT")
+                   or Path(__file__).resolve().parent.parent)
 CONTAINER_SCRIPT = "/docker_volume/replay_wuji_vr_dataset.py"
 FRANKA_SETUP = "/docker_volume/setup_env.sh"
 WUJI_SETUP = "/home/wuji/ros2_ws/install/setup.bash"
@@ -35,10 +38,11 @@ FRANKA_PID = "/tmp/wuji_replay_franka.pid"
 WUJI_PID = "/tmp/wuji_replay_hand.pid"
 FRANKA_LOG = "/tmp/wuji_replay_franka.log"
 WUJI_LOG = "/tmp/wuji_replay_hand.log"
-HAND_CONFIG = Path(
-    "/home/wang/sy/wuji-hand-teleop/src/output_devices/"
-    "wujihand_output/config/wujihand_ik.yaml"
-)
+# Wuji 灵巧手的 IK 配置（读右手 serial_number）。属于另一个项目，不在本仓库内，
+# 路径因人而异，用环境变量 WUJI_HAND_CONFIG 指定。
+HAND_CONFIG = Path(os.environ.get(
+    "WUJI_HAND_CONFIG",
+    "/opt/wuji-hand-teleop/src/output_devices/wujihand_output/config/wujihand_ik.yaml"))
 HAND_DOF = 20
 
 

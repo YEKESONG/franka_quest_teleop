@@ -4,7 +4,7 @@
   <name>franka_vr</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="18108569171@163.com">root</maintainer>
+  <maintainer email="noreply@example.com">franka_quest_teleop maintainers</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

@@ -1,5 +1,4 @@
-> **收录说明**（2026-08-13）：本文原件在 `~/sy/VR遥操Franka_IK与控制调优复盘.md`，
-> 逐字收进本仓库，正文未改。文中的容器路径 `/docker_volume/...` 就是**本仓库根目录**，
+> **收录说明**（2026-08-13）：本文是项目进行中写的工作记录，逐字收进本仓库，正文未改。文中的容器路径 `/docker_volume/...` 就是**本仓库根目录**，
 > 例如 `/docker_volume/ws_franka_vr/...` = 仓库里的 `ws_franka_vr/...`。
 > 文末"第六部分"第 5 条提到的"活跃代码未纳入 git"——就是本次整合要解决的问题，现已解决。
 
@@ -256,7 +255,7 @@ SCALE = 2.0            # 手柄位移 -> franka 位移
 
 ## 附：关键文件与路径
 
-| 内容 | 路径（容器内 `/docker_volume` = 主机 `/home/wang/libfranka-docker/docker_volume`） |
+| 内容 | 路径（容器内 `/docker_volume` = 本仓库根目录） |
 |---|---|
 | 外环控制节点 | `ws_franka_vr/src/franka_vr/src/franka_vr_vel.cpp` |
 | IK 配置 | `ws_franka_vr/src/franka_vr/config/kinematics_{left,right}.yaml` |

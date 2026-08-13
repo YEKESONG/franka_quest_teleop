@@ -19,11 +19,9 @@ services:
       context: ./franka_ros2
       dockerfile: Dockerfile
 
-    # ⚠️ 这台开发机上已经有一个在跑的老容器 franka_dev（镜像 tag libfranka:franka_ros2）。
-    #    这里【故意】用不同的镜像 tag，避免 build 把老 tag 抢走影响正在跑的通路。
-    #    容器名默认仍是 franka_dev（tools/ 里的脚本 docker exec 找的就是这个名字）；
-    #    要和老容器并存就改名：
-    #        FRANKA_CONTAINER_NAME=franka_dev2 docker compose -f ... up -d
+    # 镜像 tag 与容器名都可以用环境变量覆盖。机器上已经有同名镜像/容器时（例如早期
+    # 手工搭的环境），改名即可并存，不会互相覆盖：
+    #     FRANKA_IMAGE=my:tag FRANKA_CONTAINER_NAME=franka_dev2 docker compose -f ... up -d
     image: ${FRANKA_IMAGE:-franka_quest_teleop:humble}
 
     container_name: ${FRANKA_CONTAINER_NAME:-franka_dev}
